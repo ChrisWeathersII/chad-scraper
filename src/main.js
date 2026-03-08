@@ -100,7 +100,7 @@ const extractListing = ($, url) => {
 };
 
 const crawler = new CheerioCrawler({
-    maxRequestsPerCrawl: 200,
+    maxRequestsPerCrawl: 500,
     maxConcurrency: 2,
     requestHandlerTimeoutSecs: 30,
 
@@ -108,9 +108,10 @@ const crawler = new CheerioCrawler({
         const url = request.url;
         log.info(`Processing: ${url}`);
 
-        if (!url.includes('/businesses-for-sale/') || url.match(/\/\d+\/?$/)) {
+        // Individual listing page - URL contains a numeric ID at the end
+        if (url.match(/\/\d+\/?(\?.*)?$/)) {
             const deal = extractListing($, url);
-            if (deal.company_name) {
+            if (deal.company_name && deal.company_name.length > 3) {
                 await Dataset.pushData(deal);
 
                 const { error } = await supabase
@@ -124,24 +125,31 @@ const crawler = new CheerioCrawler({
                 }
             }
         } else {
+            // Category or index page - find individual listing links
             const listingLinks = [];
 
-            $('a[href*="/businesses-for-sale/"]').each((i, el) => {
+            $('a[href]').each((i, el) => {
                 const href = $(el).attr('href');
-                if (href && href.match(/\/\d+\/?$/) || href?.includes('/listing/')) {
+                if (href && href.match(/bizbuysell\.com\/.*\/\d+\/?$/) ||
+                    href && href.match(/^\/.*\/\d+\/?$/)) {
                     const fullUrl = href.startsWith('http')
                         ? href
                         : `https://www.bizbuysell.com${href}`;
-                    listingLinks.push(fullUrl);
+                    if (!listingLinks.includes(fullUrl)) {
+                        listingLinks.push(fullUrl);
+                    }
                 }
             });
 
             if (listingLinks.length > 0) {
                 await enqueueLinks({ urls: listingLinks });
-                log.info(`Found ${listingLinks.length} listings on ${url}`);
+                log.info(`Found ${listingLinks.length} individual listings on ${url}`);
+            } else {
+                log.info(`No individual listings found on ${url}`);
             }
 
-            const nextPage = $('a[aria-label="Next"], a.next, a[rel="next"]').attr('href');
+            // Enqueue next page
+            const nextPage = $('a[aria-label="Next"], a.next, a[rel="next"], a[aria-label="Next Page"]').attr('href');
             if (nextPage) {
                 const nextUrl = nextPage.startsWith('http')
                     ? nextPage
