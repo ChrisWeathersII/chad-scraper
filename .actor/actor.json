@@ -1,0 +1,8 @@
+{
+    "actorSpecification": 1,
+    "name": "chad-scraper",
+    "title": "Chad BizBuySell Scraper",
+    "description": "Scrapes BizBuySell listings for Chad deal sourcing platform",
+    "version": "0.0",
+    "buildTag": "latest"
+}
