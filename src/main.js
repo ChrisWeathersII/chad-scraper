@@ -48,7 +48,7 @@ const extractListing = ($, url) => {
         .first().text().trim() || '';
 
     const cashFlowText =
-        $('td:contains("Cash Flow") + td, td:contains("EBITDA") + td, span[class*="cash"]')
+        $('td:contains("Cash Flow") + td, td:contains("EBITDA") + td, td:contains("Seller Discretionary") + td, td:contains("SDE") + td, td:contains("Discretionary Earnings") + td, td:contains("Net Income") + td, span[class*="cash"], span[class*="sde"]')
         .first().text().trim() || '';
 
     const employeesText =
@@ -56,7 +56,7 @@ const extractListing = ($, url) => {
         .first().text().trim() || '';
 
     const industry =
-        $('span[class*="industry"], a[class*="category"], nav[class*="breadcrumb"] a')
+        $('span[class*="industry"], a[class*="category"], nav[class*="breadcrumb"] a, td:contains("Industry") + td, td:contains("Category") + td, span[class*="type"]')
         .last().text().trim() || '';
 
     const broker_name =
@@ -108,7 +108,6 @@ const crawler = new CheerioCrawler({
         const url = request.url;
         log.info(`Processing: ${url}`);
 
-        // Individual listing page - URL contains a numeric ID at the end
         if (url.match(/\/\d+\/?(\?.*)?$/)) {
             const deal = extractListing($, url);
             if (deal.company_name && deal.company_name.length > 3) {
@@ -125,7 +124,6 @@ const crawler = new CheerioCrawler({
                 }
             }
         } else {
-            // Category or index page - find individual listing links
             const listingLinks = [];
 
             $('a[href]').each((i, el) => {
@@ -148,7 +146,6 @@ const crawler = new CheerioCrawler({
                 log.info(`No individual listings found on ${url}`);
             }
 
-            // Enqueue next page
             const nextPage = $('a[aria-label="Next"], a.next, a[rel="next"], a[aria-label="Next Page"]').attr('href');
             if (nextPage) {
                 const nextUrl = nextPage.startsWith('http')
