@@ -110,19 +110,31 @@ const crawler = new CheerioCrawler({
 
         if (url.match(/\/\d+\/?(\?.*)?$/)) {
             const deal = extractListing($, url);
-            if (deal.company_name && deal.company_name.length > 3) {
-                await Dataset.pushData(deal);
 
-                const { error } = await supabase
-                    .from('deals')
-                    .upsert(deal, { onConflict: 'source_id' });
-
-                if (error) {
-                    log.error(`Supabase error for ${deal.company_name}: ${error.message}`);
-                } else {
-                    log.info(`Saved to Supabase: ${deal.company_name} in ${deal.city}, ${deal.state}`);
-                }
+            // Skip deals with no company name
+            if (!deal.company_name || deal.company_name.length <= 3) {
+                log.info(`Skipping listing with no company name: ${url}`);
+                return;
             }
+
+            // Skip deals with confirmed asking price below $500k
+            if (deal.asking_price !== null && deal.asking_price < 500000) {
+                log.info(`Skipping deal below $500k threshold: ${deal.company_name} at $${deal.asking_price}`);
+                return;
+            }
+
+            await Dataset.pushData(deal);
+
+            const { error } = await supabase
+                .from('deals')
+                .upsert(deal, { onConflict: 'source_id' });
+
+            if (error) {
+                log.error(`Supabase error for ${deal.company_name}: ${error.message}`);
+            } else {
+                log.info(`Saved to Supabase: ${deal.company_name} in ${deal.city}, ${deal.state} at $${deal.asking_price}`);
+            }
+
         } else {
             const listingLinks = [];
 
