@@ -1,21 +1,13 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+import { Actor } from 'apify';
+import { CheerioCrawler, Dataset } from 'crawlee';
 import { createClient } from '@supabase/supabase-js';
+
+// This MUST be first before anything else
+await Actor.init();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-const HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1',
-};
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const parseNumber = (text) => {
     if (!text) return null;
@@ -29,24 +21,6 @@ const parseNumber = (text) => {
         return num * 1000;
     }
     return num;
-};
-
-const fetchPage = async (url, retries = 3) => {
-    for (let i = 0; i < retries; i++) {
-        try {
-            await sleep(1000 + Math.random() * 2000);
-            const response = await axios.get(url, {
-                headers: HEADERS,
-                timeout: 30000,
-                maxRedirects: 5,
-            });
-            return response.data;
-        } catch (err) {
-            console.log(`Attempt ${i + 1} failed for ${url}: ${err.message}`);
-            if (i < retries - 1) await sleep(3000);
-        }
-    }
-    return null;
 };
 
 const extractListing = ($, url) => {
@@ -130,42 +104,80 @@ const extractListing = ($, url) => {
     };
 };
 
-const getListingUrls = async (categoryUrl) => {
-    const urls = [];
-    let page = 1;
-    let hasMore = true;
+const crawler = new CheerioCrawler({
+    maxRequestsPerCrawl: 1000,
+    maxConcurrency: 3,
+    requestHandlerTimeoutSecs: 30,
+    useSessionPool: false,
+    persistCookiesPerSession: false,
 
-    while (hasMore && page <= 10) {
-        const pageUrl = page === 1 ? categoryUrl : `${categoryUrl}${page}/`;
-        console.log(`Fetching category page: ${pageUrl}`);
-        const html = await fetchPage(pageUrl);
-        if (!html) break;
+    async requestHandler({ $, request, enqueueLinks, log }) {
+        const url = request.url;
+        log.info(`Processing: ${url}`);
 
-        const $ = cheerio.load(html);
-        let found = 0;
+        if (url.match(/\/\d+\/?(\?.*)?$/)) {
+            const deal = extractListing($, url);
 
-        $('a[href]').each((i, el) => {
-            const href = $(el).attr('href');
-            if (href && href.match(/\/\d+\/?$/)) {
-                const fullUrl = href.startsWith('http')
-                    ? href
-                    : `https://www.bizbuysell.com${href}`;
-                if (!urls.includes(fullUrl)) {
-                    urls.push(fullUrl);
-                    found++;
-                }
+            if (!deal.company_name || deal.company_name.length <= 3) {
+                log.info(`Skipping listing with no company name: ${url}`);
+                return;
             }
-        });
 
-        console.log(`Found ${found} listing URLs on page ${page}`);
-        hasMore = found > 0;
-        page++;
-    }
+            if (deal.asking_price !== null && deal.asking_price < 500000) {
+                log.info(`Skipping deal below $500k: ${deal.company_name} at $${deal.asking_price}`);
+                return;
+            }
 
-    return urls;
-};
+            await Dataset.pushData(deal);
 
-const START_URLS = [
+            const { error } = await supabase
+                .from('deals')
+                .upsert(deal, { onConflict: 'source_id' });
+
+            if (error) {
+                log.error(`Supabase error for ${deal.company_name}: ${error.message}`);
+            } else {
+                log.info(`Saved: ${deal.company_name} | ${deal.city}, ${deal.state} | $${deal.asking_price}`);
+            }
+
+        } else {
+            const listingLinks = [];
+
+            $('a[href]').each((i, el) => {
+                const href = $(el).attr('href');
+                if (href && href.match(/bizbuysell\.com\/.*\/\d+\/?$/) ||
+                    href && href.match(/^\/.*\/\d+\/?$/)) {
+                    const fullUrl = href.startsWith('http')
+                        ? href
+                        : `https://www.bizbuysell.com${href}`;
+                    if (!listingLinks.includes(fullUrl)) {
+                        listingLinks.push(fullUrl);
+                    }
+                }
+            });
+
+            if (listingLinks.length > 0) {
+                await enqueueLinks({ urls: listingLinks });
+                log.info(`Found ${listingLinks.length} listings on ${url}`);
+            }
+
+            const nextPage = $('a[aria-label="Next"], a.next, a[rel="next"], a[aria-label="Next Page"]').attr('href');
+            if (nextPage) {
+                const nextUrl = nextPage.startsWith('http')
+                    ? nextPage
+                    : `https://www.bizbuysell.com${nextPage}`;
+                await enqueueLinks({ urls: [nextUrl] });
+                log.info(`Queued next page: ${nextUrl}`);
+            }
+        }
+    },
+
+    failedRequestHandler({ request, log }) {
+        log.error(`Failed: ${request.url}`);
+    },
+});
+
+await crawler.run([
     'https://www.bizbuysell.com/building-and-construction-businesses-for-sale/',
     'https://www.bizbuysell.com/hvac-businesses-for-sale/',
     'https://www.bizbuysell.com/electrical-and-mechanical-contracting-businesses-for-sale/',
@@ -186,53 +198,13 @@ const START_URLS = [
     'https://www.bizbuysell.com/home-health-care-businesses-for-sale/',
     'https://www.bizbuysell.com/insurance-agencies-for-sale/',
     'https://www.bizbuysell.com/auto-repair-and-service-shops-for-sale/',
-];
+    'https://www.bizbuysell.com/financial-services-businesses-for-sale/',
+    'https://www.bizbuysell.com/accounting-businesses-and-tax-practices-for-sale/',
+    'https://www.bizbuysell.com/automotive-and-boat-businesses-for-sale/',
+    'https://www.bizbuysell.com/car-washes-for-sale/',
+    'https://www.bizbuysell.com/equipment-rental-and-dealers-for-sale/',
+    'https://www.bizbuysell.com/it-and-software-services-businesses-for-sale/',
+    'https://www.bizbuysell.com/agriculture-businesses-for-sale/',
+]);
 
-console.log('Collecting listing URLs...');
-const allListingUrls = [];
-for (const categoryUrl of START_URLS) {
-    const urls = await getListingUrls(categoryUrl);
-    allListingUrls.push(...urls);
-    console.log(`Total URLs so far: ${allListingUrls.length}`);
-}
-
-const uniqueUrls = [...new Set(allListingUrls)];
-console.log(`Total unique listing URLs: ${uniqueUrls.length}`);
-
-let saved = 0;
-let skipped = 0;
-
-for (const url of uniqueUrls) {
-    console.log(`Processing: ${url}`);
-    const html = await fetchPage(url);
-    if (!html) {
-        console.log(`Failed to fetch: ${url}`);
-        continue;
-    }
-
-    const $ = cheerio.load(html);
-    const deal = extractListing($, url);
-
-    if (!deal.company_name || deal.company_name.length <= 3) {
-        skipped++;
-        continue;
-    }
-
-    if (deal.asking_price !== null && deal.asking_price < 500000) {
-        skipped++;
-        continue;
-    }
-
-    const { error } = await supabase
-        .from('deals')
-        .upsert(deal, { onConflict: 'source_id' });
-
-    if (error) {
-        console.log(`Supabase error for ${deal.company_name}: ${error.message}`);
-    } else {
-        saved++;
-        console.log(`Saved (${saved}): ${deal.company_name} | ${deal.city}, ${deal.state} | $${deal.asking_price}`);
-    }
-}
-
-console.log(`Done. Saved: ${saved}, Skipped: ${skipped}`);
+await Actor.exit();
