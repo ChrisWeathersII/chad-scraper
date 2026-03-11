@@ -1,14 +1,11 @@
 {
     "name": "chad-scraper",
-    "version": "1.0.0",
+    "version": "0.0.5",
     "type": "module",
-    "description": "BizBuySell scraper for Chad deal sourcing platform",
-    "scripts": {
-        "start": "node src/main.js"
-    },
     "dependencies": {
         "apify": "^3.0.0",
         "crawlee": "^3.0.0",
-        "@supabase/supabase-js": "^2.0.0"
+        "@supabase/supabase-js": "^2.0.0",
+        "playwright": "^1.40.0"
     }
 }
