@@ -1,14 +1,9 @@
 {
+    "actorSpecification": 1,
     "name": "chad-scraper",
-    "version": "0.0.8",
-    "type": "module",
-    "engines": {
-        "node": ">=18.0.0"
-    },
-    "dependencies": {
-        "apify": "^3.0.0",
-        "@crawlee/cheerio": "^3.0.0",
-        "@crawlee/core": "^3.0.0",
-        "@supabase/supabase-js": "^2.0.0"
-    }
+    "title": "Chad BizBuySell Scraper",
+    "description": "Scrapes BizBuySell listings for Chad deal sourcing platform",
+    "version": "0.0",
+    "buildTag": "latest",
+    "dockerImage": "apify/actor-node:18"
 }
