@@ -171,7 +171,6 @@ const crawler = new CheerioCrawler({
 });
 
 await crawler.run([
-    // Building and Construction
     'https://www.bizbuysell.com/building-and-construction-businesses-for-sale/',
     'https://www.bizbuysell.com/hvac-businesses-for-sale/',
     'https://www.bizbuysell.com/electrical-and-mechanical-contracting-businesses-for-sale/',
@@ -182,8 +181,6 @@ await crawler.run([
     'https://www.bizbuysell.com/carpet-flooring-businesses-for-sale/',
     'https://www.bizbuysell.com/painting-businesses-for-sale/',
     'https://www.bizbuysell.com/fencing-businesses-for-sale/',
-
-    // Manufacturing
     'https://www.bizbuysell.com/manufacturing-businesses-for-sale/',
     'https://www.bizbuysell.com/industrial-and-commercial-machinery-manufacturers-for-sale/',
     'https://www.bizbuysell.com/metal-product-manufacturers-for-sale/',
@@ -194,8 +191,6 @@ await crawler.run([
     'https://www.bizbuysell.com/chemical-and-related-product-manufacturers-for-sale/',
     'https://www.bizbuysell.com/lumber-and-wood-products-manufacturers-for-sale/',
     'https://www.bizbuysell.com/paper-manufacturers-and-printing-businesses-for-sale/',
-
-    // Service Businesses
     'https://www.bizbuysell.com/service-businesses-for-sale/',
     'https://www.bizbuysell.com/cleaning-businesses-for-sale/',
     'https://www.bizbuysell.com/landscaping-and-yard-service-businesses-for-sale/',
@@ -209,47 +204,31 @@ await crawler.run([
     'https://www.bizbuysell.com/marketing-and-advertising-businesses-for-sale/',
     'https://www.bizbuysell.com/solar-businesses-for-sale/',
     'https://www.bizbuysell.com/funeral-homes-for-sale/',
-
-    // Transportation and Storage
     'https://www.bizbuysell.com/transportation-and-storage-businesses-for-sale/',
     'https://www.bizbuysell.com/trucking-companies-for-sale/',
     'https://www.bizbuysell.com/storage-facilities-and-warehouses-for-sale/',
     'https://www.bizbuysell.com/freight-brokerages-for-sale/',
     'https://www.bizbuysell.com/moving-and-shipping-businesses-for-sale/',
-
-    // Wholesale and Distribution
     'https://www.bizbuysell.com/wholesale-and-distribution-businesses-for-sale/',
     'https://www.bizbuysell.com/durable-goods-wholesalers-and-distributors-for-sale/',
     'https://www.bizbuysell.com/nondurable-goods-wholesalers-and-distributors-for-sale/',
-
-    // Health Care
     'https://www.bizbuysell.com/health-care-and-fitness-businesses-for-sale/',
     'https://www.bizbuysell.com/home-health-care-businesses-for-sale/',
     'https://www.bizbuysell.com/assisted-living-and-nursing-homes-for-sale/',
     'https://www.bizbuysell.com/medical-practices-for-sale/',
     'https://www.bizbuysell.com/dental-practices-for-sale/',
     'https://www.bizbuysell.com/medical-transportation-businesses-for-sale/',
-
-    // Financial Services
     'https://www.bizbuysell.com/financial-services-businesses-for-sale/',
     'https://www.bizbuysell.com/accounting-businesses-and-tax-practices-for-sale/',
     'https://www.bizbuysell.com/insurance-agencies-for-sale/',
-
-    // Automotive
     'https://www.bizbuysell.com/automotive-and-boat-businesses-for-sale/',
     'https://www.bizbuysell.com/auto-repair-and-service-shops-for-sale/',
     'https://www.bizbuysell.com/car-washes-for-sale/',
     'https://www.bizbuysell.com/equipment-rental-and-dealers-for-sale/',
-
-    // Online and Technology
     'https://www.bizbuysell.com/online-and-technology-businesses-for-sale/',
     'https://www.bizbuysell.com/it-and-software-services-businesses-for-sale/',
     'https://www.bizbuysell.com/saas-businesses-for-sale/',
-
-    // Agriculture
     'https://www.bizbuysell.com/agriculture-businesses-for-sale/',
-
-    // Education
     'https://www.bizbuysell.com/education-and-child-related-businesses-for-sale/',
     'https://www.bizbuysell.com/schools-for-sale/',
 ]);
