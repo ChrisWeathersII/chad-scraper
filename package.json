@@ -1,11 +1,10 @@
 {
     "name": "chad-scraper",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "type": "module",
     "dependencies": {
         "apify": "^3.0.0",
         "crawlee": "^3.0.0",
-        "@supabase/supabase-js": "^2.0.0",
-        "playwright": "^1.40.0"
+        "@supabase/supabase-js": "^2.0.0"
     }
 }
