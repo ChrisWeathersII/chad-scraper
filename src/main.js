@@ -1,9 +1,6 @@
-import { Actor } from 'apify';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
-
-await Actor.init();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
@@ -191,7 +188,6 @@ const START_URLS = [
     'https://www.bizbuysell.com/auto-repair-and-service-shops-for-sale/',
 ];
 
-// Collect all listing URLs first
 console.log('Collecting listing URLs...');
 const allListingUrls = [];
 for (const categoryUrl of START_URLS) {
@@ -200,11 +196,9 @@ for (const categoryUrl of START_URLS) {
     console.log(`Total URLs so far: ${allListingUrls.length}`);
 }
 
-// Deduplicate
 const uniqueUrls = [...new Set(allListingUrls)];
 console.log(`Total unique listing URLs: ${uniqueUrls.length}`);
 
-// Process each listing
 let saved = 0;
 let skipped = 0;
 
@@ -242,5 +236,3 @@ for (const url of uniqueUrls) {
 }
 
 console.log(`Done. Saved: ${saved}, Skipped: ${skipped}`);
-
-await Actor.exit();
