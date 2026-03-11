@@ -4,5 +4,6 @@
     "title": "Chad BizBuySell Scraper",
     "description": "Scrapes BizBuySell listings for Chad deal sourcing platform",
     "version": "0.0",
-    "buildTag": "latest"
+    "buildTag": "latest",
+    "dockerImage": "apify/actor-node:18"
 }
