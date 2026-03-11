@@ -1,5 +1,5 @@
 import { Actor } from 'apify';
-import { CheerioCrawler, Dataset } from 'crawlee';
+import { PlaywrightCrawler, Dataset } from 'crawlee';
 import { createClient } from '@supabase/supabase-js';
 
 await Actor.init();
@@ -13,115 +13,255 @@ const parseNumber = (text) => {
     const cleaned = text.replace(/[$,\s]/g, '');
     const num = parseFloat(cleaned);
     if (isNaN(num)) return null;
-    if (text.toLowerCase().includes('million') || text.toLowerCase().includes(' m')) {
-        return num * 1000000;
-    }
-    if (text.toLowerCase().includes('k')) {
-        return num * 1000;
-    }
+    if (text.toLowerCase().includes('million')) return num * 1000000;
+    if (text.toLowerCase().includes('k')) return num * 1000;
     return num;
 };
 
-const extractListing = ($, url) => {
-    const company_name =
-        $('h1.bfsTitle, h1[class*="title"], h1').first().text().trim() ||
-        $('meta[property="og:title"]').attr('content') || '';
+const extractBizBuySell = (page, url) => {
+    return page.evaluate((url) => {
+        const getText = (selectors) => {
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                if (el && el.textContent.trim()) return el.textContent.trim();
+            }
+            return '';
+        };
 
-    const description =
-        $('p.bfsDescription, div[class*="description"] p, div.description')
-        .first().text().trim() ||
-        $('meta[name="description"]').attr('content') || '';
+        const getTableValue = (label) => {
+            const cells = document.querySelectorAll('td');
+            for (let i = 0; i < cells.length; i++) {
+                if (cells[i].textContent.trim().toLowerCase().includes(label.toLowerCase())) {
+                    return cells[i + 1]?.textContent.trim() || '';
+                }
+            }
+            return '';
+        };
 
-    const locationText =
-        $('span[class*="location"], div[class*="location"], h2[class*="location"]')
-        .first().text().trim() || '';
-    const locationParts = locationText.split(',').map(s => s.trim());
-    const city = locationParts[0] || '';
-    const state = locationParts[1] || '';
+        const locationText = getText([
+            'span[class*="location"]',
+            'div[class*="location"]',
+            'h2[class*="location"]'
+        ]);
+        const locationParts = locationText.split(',').map(s => s.trim());
 
-    const askingPriceText =
-        $('span[class*="asking"], div[class*="asking-price"], td:contains("Asking Price") + td')
-        .first().text().trim() || '';
+        const sourceId = url.split('/').filter(Boolean).pop()?.split('?')[0] || '';
 
-    const revenueText =
-        $('td:contains("Gross Revenue") + td, td:contains("Revenue") + td, span[class*="revenue"]')
-        .first().text().trim() || '';
-
-    const cashFlowText =
-        $('td:contains("Cash Flow") + td, td:contains("EBITDA") + td, td:contains("Seller Discretionary") + td, td:contains("SDE") + td, td:contains("Discretionary Earnings") + td, td:contains("Net Income") + td, span[class*="cash"], span[class*="sde"]')
-        .first().text().trim() || '';
-
-    const employeesText =
-        $('td:contains("Employees") + td, span[class*="employee"]')
-        .first().text().trim() || '';
-
-    const industry =
-        $('span[class*="industry"], a[class*="category"], nav[class*="breadcrumb"] a, td:contains("Industry") + td, td:contains("Category") + td, span[class*="type"]')
-        .last().text().trim() || '';
-
-    const broker_name =
-        $('span[class*="broker-name"], div[class*="broker"] h3, div[class*="agent"] strong')
-        .first().text().trim() || '';
-
-    const broker_firm =
-        $('span[class*="broker-firm"], div[class*="brokerage"] span, div[class*="company-name"]')
-        .first().text().trim() || '';
-
-    const broker_email =
-        $('a[href^="mailto:"]').first().attr('href')?.replace('mailto:', '') || '';
-
-    const broker_phone =
-        $('span[class*="phone"], a[href^="tel:"]').first().text().trim() || '';
-
-    const sourceId = url.split('/').filter(Boolean).pop()?.split('?')[0] || '';
-
-    return {
-        source: 'bizbuysell',
-        source_url: url,
-        source_id: sourceId,
-        deal_type: 'brokered',
-        company_name: company_name.substring(0, 255),
-        description: description.substring(0, 500),
-        industry: industry.substring(0, 100),
-        city: city.substring(0, 100),
-        state: state.substring(0, 50),
-        asking_price: parseNumber(askingPriceText),
-        revenue: parseNumber(revenueText),
-        cash_flow: parseNumber(cashFlowText),
-        employees: parseInt(employeesText) || null,
-        broker_name: broker_name.substring(0, 255),
-        broker_firm: broker_firm.substring(0, 255),
-        broker_email: broker_email.substring(0, 255),
-        broker_phone: broker_phone.substring(0, 50),
-        listing_date: new Date().toISOString().split('T')[0],
-        status: 'active',
-        scraped_at: new Date().toISOString(),
-    };
+        return {
+            source: 'bizbuysell',
+            source_url: url,
+            source_id: `bbs_${sourceId}`,
+            deal_type: 'brokered',
+            company_name: getText(['h1.bfsTitle', 'h1[class*="title"]', 'h1']).substring(0, 255),
+            description: getText(['p.bfsDescription', 'div[class*="description"] p', 'meta[name="description"]']).substring(0, 500),
+            industry: getText(['span[class*="industry"]', 'a[class*="category"]', 'td:last-child']).substring(0, 100),
+            city: (locationParts[0] || '').substring(0, 100),
+            state: (locationParts[1] || '').substring(0, 50),
+            asking_price: getTableValue('Asking Price'),
+            revenue: getTableValue('Gross Revenue'),
+            cash_flow: getTableValue('Cash Flow') || getTableValue('EBITDA') || getTableValue('SDE'),
+            employees: getTableValue('Employees'),
+            broker_name: getText(['span[class*="broker-name"]', 'div[class*="broker"] h3']).substring(0, 255),
+            broker_firm: getText(['span[class*="broker-firm"]', 'div[class*="brokerage"] span']).substring(0, 255),
+            broker_email: document.querySelector('a[href^="mailto:"]')?.href?.replace('mailto:', '') || '',
+            broker_phone: getText(['span[class*="phone"]', 'a[href^="tel:"]']).substring(0, 50),
+        };
+    }, url);
 };
 
-const crawler = new CheerioCrawler({
+const extractBizQuest = (page, url) => {
+    return page.evaluate((url) => {
+        const getText = (selectors) => {
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                if (el && el.textContent.trim()) return el.textContent.trim();
+            }
+            return '';
+        };
+
+        const getTableValue = (label) => {
+            const cells = document.querySelectorAll('td, .listing-detail-item');
+            for (let i = 0; i < cells.length; i++) {
+                if (cells[i].textContent.trim().toLowerCase().includes(label.toLowerCase())) {
+                    return cells[i + 1]?.textContent.trim() ||
+                           cells[i].nextElementSibling?.textContent.trim() || '';
+                }
+            }
+            return '';
+        };
+
+        const locationText = getText([
+            '.listing-location',
+            'span[class*="location"]',
+            'div[class*="location"]',
+            '.city-state'
+        ]);
+        const locationParts = locationText.split(',').map(s => s.trim());
+
+        const pathParts = url.split('/').filter(Boolean);
+        const sourceId = pathParts[pathParts.length - 1]?.split('?')[0] || '';
+
+        return {
+            source: 'bizquest',
+            source_url: url,
+            source_id: `bq_${sourceId}`,
+            deal_type: 'brokered',
+            company_name: getText([
+                'h1.listing-title',
+                'h1[class*="title"]',
+                '.business-name',
+                'h1'
+            ]).substring(0, 255),
+            description: getText([
+                '.listing-description',
+                'div[class*="description"]',
+                '.business-description p'
+            ]).substring(0, 500),
+            industry: getText([
+                '.listing-category',
+                'span[class*="category"]',
+                '.industry-type'
+            ]).substring(0, 100),
+            city: (locationParts[0] || '').substring(0, 100),
+            state: (locationParts[1] || '').substring(0, 50),
+            asking_price: getTableValue('Asking Price') || getTableValue('Price'),
+            revenue: getTableValue('Gross Revenue') || getTableValue('Revenue'),
+            cash_flow: getTableValue('Cash Flow') || getTableValue('EBITDA') || getTableValue('SDE'),
+            employees: getTableValue('Employees'),
+            broker_name: getText([
+                '.broker-name',
+                'span[class*="broker"]',
+                '.agent-name'
+            ]).substring(0, 255),
+            broker_firm: getText([
+                '.broker-company',
+                '.brokerage-name',
+                '.agent-company'
+            ]).substring(0, 255),
+            broker_email: document.querySelector('a[href^="mailto:"]')?.href?.replace('mailto:', '') || '',
+            broker_phone: getText(['.broker-phone', 'a[href^="tel:"]', '.phone-number']).substring(0, 50),
+        };
+    }, url);
+};
+
+const extractBusinessBroker = (page, url) => {
+    return page.evaluate((url) => {
+        const getText = (selectors) => {
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                if (el && el.textContent.trim()) return el.textContent.trim();
+            }
+            return '';
+        };
+
+        const getTableValue = (label) => {
+            const rows = document.querySelectorAll('tr, .detail-row, .listing-info-item');
+            for (const row of rows) {
+                if (row.textContent.toLowerCase().includes(label.toLowerCase())) {
+                    const cells = row.querySelectorAll('td, .value, span');
+                    if (cells.length > 1) return cells[cells.length - 1].textContent.trim();
+                }
+            }
+            return '';
+        };
+
+        const locationText = getText([
+            '.listing-location',
+            'span[class*="location"]',
+            '.business-location',
+            'h2[class*="location"]'
+        ]);
+        const locationParts = locationText.split(',').map(s => s.trim());
+
+        const pathParts = url.split('/').filter(Boolean);
+        const sourceId = pathParts[pathParts.length - 1]?.split('?')[0]?.replace('.aspx', '') || '';
+
+        return {
+            source: 'businessbroker',
+            source_url: url,
+            source_id: `bb_${sourceId}`,
+            deal_type: 'brokered',
+            company_name: getText([
+                'h1.listing-title',
+                'h1[class*="title"]',
+                '.business-name',
+                'h1'
+            ]).substring(0, 255),
+            description: getText([
+                '.listing-description',
+                '.business-description',
+                'div[class*="description"] p'
+            ]).substring(0, 500),
+            industry: getText([
+                '.listing-category',
+                '.business-type',
+                'span[class*="category"]'
+            ]).substring(0, 100),
+            city: (locationParts[0] || '').substring(0, 100),
+            state: (locationParts[1] || '').substring(0, 50),
+            asking_price: getTableValue('Asking Price') || getTableValue('Price'),
+            revenue: getTableValue('Gross Revenue') || getTableValue('Revenue') || getTableValue('Sales'),
+            cash_flow: getTableValue('Cash Flow') || getTableValue('EBITDA') || getTableValue('SDE') || getTableValue('Discretionary'),
+            employees: getTableValue('Employees'),
+            broker_name: getText(['.broker-name', '.agent-name', 'span[class*="broker"]']).substring(0, 255),
+            broker_firm: getText(['.broker-company', '.brokerage-name']).substring(0, 255),
+            broker_email: document.querySelector('a[href^="mailto:"]')?.href?.replace('mailto:', '') || '',
+            broker_phone: getText(['.broker-phone', 'a[href^="tel:"]']).substring(0, 50),
+        };
+    }, url);
+};
+
+const crawler = new PlaywrightCrawler({
     maxRequestsPerCrawl: 500,
     maxConcurrency: 2,
-    requestHandlerTimeoutSecs: 30,
+    requestHandlerTimeoutSecs: 60,
+    launchContext: {
+        launchOptions: {
+            headless: true,
+        },
+    },
 
-    async requestHandler({ $, request, enqueueLinks, log }) {
+    async requestHandler({ page, request, enqueueLinks, log }) {
         const url = request.url;
         log.info(`Processing: ${url}`);
 
-        if (url.match(/\/\d+\/?(\?.*)?$/)) {
-            const deal = extractListing($, url);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-            // Skip deals with no company name
+        let deal = null;
+        let isListing = false;
+
+        if (url.includes('bizbuysell.com')) {
+            isListing = url.match(/\/\d+\/?(\?.*)?$/);
+            if (isListing) deal = await extractBizBuySell(page, url);
+
+        } else if (url.includes('bizquest.com')) {
+            isListing = url.includes('/BW') || url.match(/\/[A-Z]{2}\d+\/?$/);
+            if (isListing) deal = await extractBizQuest(page, url);
+
+        } else if (url.includes('businessbroker.net')) {
+            isListing = url.includes('.aspx') && !url.includes('search') && !url.includes('list');
+            if (isListing) deal = await extractBusinessBroker(page, url);
+        }
+
+        if (deal) {
             if (!deal.company_name || deal.company_name.length <= 3) {
-                log.info(`Skipping listing with no company name: ${url}`);
+                log.info(`Skipping: no company name at ${url}`);
                 return;
             }
 
-            // Skip deals with confirmed asking price below $500k
-            if (deal.asking_price !== null && deal.asking_price < 500000) {
-                log.info(`Skipping deal below $500k threshold: ${deal.company_name} at $${deal.asking_price}`);
+            const askingNum = parseNumber(deal.asking_price);
+            if (askingNum !== null && askingNum < 500000) {
+                log.info(`Skipping below $500k: ${deal.company_name}`);
                 return;
             }
+
+            deal.asking_price = askingNum;
+            deal.revenue = parseNumber(deal.revenue);
+            deal.cash_flow = parseNumber(deal.cash_flow);
+            deal.employees = parseInt(deal.employees) || null;
+            deal.listing_date = new Date().toISOString().split('T')[0];
+            deal.status = 'active';
+            deal.scraped_at = new Date().toISOString();
 
             await Dataset.pushData(deal);
 
@@ -130,39 +270,44 @@ const crawler = new CheerioCrawler({
                 .upsert(deal, { onConflict: 'source_id' });
 
             if (error) {
-                log.error(`Supabase error for ${deal.company_name}: ${error.message}`);
+                log.error(`Supabase error: ${error.message}`);
             } else {
-                log.info(`Saved to Supabase: ${deal.company_name} in ${deal.city}, ${deal.state} at $${deal.asking_price}`);
+                log.info(`Saved: ${deal.company_name} | ${deal.city}, ${deal.state} | $${deal.asking_price} | ${deal.source}`);
             }
 
         } else {
-            const listingLinks = [];
+            const content = await page.content();
+            const $ = (sel) => {
+                const links = [];
+                const matches = content.matchAll(/href="([^"]+)"/g);
+                for (const match of matches) links.push(match[1]);
+                return links;
+            };
 
-            $('a[href]').each((i, el) => {
-                const href = $(el).attr('href');
-                if (href && href.match(/bizbuysell\.com\/.*\/\d+\/?$/) ||
-                    href && href.match(/^\/.*\/\d+\/?$/)) {
-                    const fullUrl = href.startsWith('http')
-                        ? href
-                        : `https://www.bizbuysell.com${href}`;
-                    if (!listingLinks.includes(fullUrl)) {
-                        listingLinks.push(fullUrl);
-                    }
-                }
-            });
+            const allHrefs = [];
+            const matches = content.matchAll(/href="([^"]+)"/g);
+            for (const match of matches) allHrefs.push(match[1]);
+
+            const listingLinks = allHrefs
+                .filter(href => {
+                    if (url.includes('bizbuysell.com')) return href.match(/\/\d+\/?$/);
+                    if (url.includes('bizquest.com')) return href.includes('/BW') || href.match(/\/[A-Z]{2}\d+\/?$/);
+                    if (url.includes('businessbroker.net')) return href.includes('.aspx') && href.includes('/business/') && !href.includes('search');
+                    return false;
+                })
+                .map(href => href.startsWith('http') ? href : `https://${url.split('/')[2]}${href}`)
+                .filter((v, i, a) => a.indexOf(v) === i);
 
             if (listingLinks.length > 0) {
                 await enqueueLinks({ urls: listingLinks });
-                log.info(`Found ${listingLinks.length} individual listings on ${url}`);
-            } else {
-                log.info(`No individual listings found on ${url}`);
+                log.info(`Queued ${listingLinks.length} listings from ${url}`);
             }
 
-            const nextPage = $('a[aria-label="Next"], a.next, a[rel="next"], a[aria-label="Next Page"]').attr('href');
-            if (nextPage) {
-                const nextUrl = nextPage.startsWith('http')
-                    ? nextPage
-                    : `https://www.bizbuysell.com${nextPage}`;
+            const nextMatch = content.match(/href="([^"]*(?:page|pg|p=)[^"]*\d+[^"]*)"/i);
+            if (nextMatch) {
+                const nextUrl = nextMatch[1].startsWith('http')
+                    ? nextMatch[1]
+                    : `https://${url.split('/')[2]}${nextMatch[1]}`;
                 await enqueueLinks({ urls: [nextUrl] });
                 log.info(`Queued next page: ${nextUrl}`);
             }
@@ -170,19 +315,47 @@ const crawler = new CheerioCrawler({
     },
 
     failedRequestHandler({ request, log }) {
-        log.error(`Failed to scrape: ${request.url}`);
+        log.error(`Failed: ${request.url}`);
     },
 });
 
 await crawler.run([
-    'https://www.bizbuysell.com/businesses-for-sale/',
+    // BizBuySell - ETA relevant categories
+    'https://www.bizbuysell.com/building-and-construction-businesses-for-sale/',
     'https://www.bizbuysell.com/hvac-businesses-for-sale/',
+    'https://www.bizbuysell.com/electrical-and-mechanical-contracting-businesses-for-sale/',
+    'https://www.bizbuysell.com/plumbing-businesses-for-sale/',
+    'https://www.bizbuysell.com/roofing-business-for-sale/',
     'https://www.bizbuysell.com/manufacturing-businesses-for-sale/',
-    'https://www.bizbuysell.com/healthcare-businesses-for-sale/',
     'https://www.bizbuysell.com/service-businesses-for-sale/',
-    'https://www.bizbuysell.com/construction-businesses-for-sale/',
-    'https://www.bizbuysell.com/transportation-businesses-for-sale/',
-    'https://www.bizbuysell.com/food-businesses-for-sale/',
+    'https://www.bizbuysell.com/landscaping-and-yard-service-businesses-for-sale/',
+    'https://www.bizbuysell.com/pest-control-businesses-for-sale/',
+    'https://www.bizbuysell.com/cleaning-businesses-for-sale/',
+    'https://www.bizbuysell.com/trucking-companies-for-sale/',
+    'https://www.bizbuysell.com/storage-facilities-and-warehouses-for-sale/',
+    'https://www.bizbuysell.com/wholesale-and-distribution-businesses-for-sale/',
+    'https://www.bizbuysell.com/health-care-and-fitness-businesses-for-sale/',
+    'https://www.bizbuysell.com/financial-services-businesses-for-sale/',
+    'https://www.bizbuysell.com/insurance-agencies-for-sale/',
+    'https://www.bizbuysell.com/auto-repair-and-service-shops-for-sale/',
+    'https://www.bizbuysell.com/it-and-software-services-businesses-for-sale/',
+
+    // BizQuest - top categories
+    'https://www.bizquest.com/businesses-for-sale/',
+    'https://www.bizquest.com/manufacturing-businesses-for-sale/',
+    'https://www.bizquest.com/service-businesses-for-sale/',
+    'https://www.bizquest.com/construction-businesses-for-sale/',
+    'https://www.bizquest.com/healthcare-businesses-for-sale/',
+    'https://www.bizquest.com/transportation-businesses-for-sale/',
+    'https://www.bizquest.com/wholesale-distribution-businesses-for-sale/',
+
+    // BusinessBroker.net - top categories
+    'https://www.businessbroker.net/businesses-for-sale/',
+    'https://www.businessbroker.net/manufacturing-businesses-for-sale/',
+    'https://www.businessbroker.net/service-businesses-for-sale/',
+    'https://www.businessbroker.net/construction-businesses-for-sale/',
+    'https://www.businessbroker.net/healthcare-businesses-for-sale/',
+    'https://www.businessbroker.net/distribution-businesses-for-sale/',
 ]);
 
 await Actor.exit();
