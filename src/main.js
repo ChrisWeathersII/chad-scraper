@@ -1,5 +1,5 @@
 import { Actor } from 'apify';
-import { CheerioCrawler, Dataset } from 'crawlee';
+import { CheerioCrawler, Dataset } from '@crawlee/cheerio';
 import { createClient } from '@supabase/supabase-js';
 
 await Actor.init();
@@ -206,31 +206,4 @@ await crawler.run([
     'https://www.bizbuysell.com/funeral-homes-for-sale/',
     'https://www.bizbuysell.com/transportation-and-storage-businesses-for-sale/',
     'https://www.bizbuysell.com/trucking-companies-for-sale/',
-    'https://www.bizbuysell.com/storage-facilities-and-warehouses-for-sale/',
-    'https://www.bizbuysell.com/freight-brokerages-for-sale/',
-    'https://www.bizbuysell.com/moving-and-shipping-businesses-for-sale/',
-    'https://www.bizbuysell.com/wholesale-and-distribution-businesses-for-sale/',
-    'https://www.bizbuysell.com/durable-goods-wholesalers-and-distributors-for-sale/',
-    'https://www.bizbuysell.com/nondurable-goods-wholesalers-and-distributors-for-sale/',
-    'https://www.bizbuysell.com/health-care-and-fitness-businesses-for-sale/',
-    'https://www.bizbuysell.com/home-health-care-businesses-for-sale/',
-    'https://www.bizbuysell.com/assisted-living-and-nursing-homes-for-sale/',
-    'https://www.bizbuysell.com/medical-practices-for-sale/',
-    'https://www.bizbuysell.com/dental-practices-for-sale/',
-    'https://www.bizbuysell.com/medical-transportation-businesses-for-sale/',
-    'https://www.bizbuysell.com/financial-services-businesses-for-sale/',
-    'https://www.bizbuysell.com/accounting-businesses-and-tax-practices-for-sale/',
-    'https://www.bizbuysell.com/insurance-agencies-for-sale/',
-    'https://www.bizbuysell.com/automotive-and-boat-businesses-for-sale/',
-    'https://www.bizbuysell.com/auto-repair-and-service-shops-for-sale/',
-    'https://www.bizbuysell.com/car-washes-for-sale/',
-    'https://www.bizbuysell.com/equipment-rental-and-dealers-for-sale/',
-    'https://www.bizbuysell.com/online-and-technology-businesses-for-sale/',
-    'https://www.bizbuysell.com/it-and-software-services-businesses-for-sale/',
-    'https://www.bizbuysell.com/saas-businesses-for-sale/',
-    'https://www.bizbuysell.com/agriculture-businesses-for-sale/',
-    'https://www.bizbuysell.com/education-and-child-related-businesses-for-sale/',
-    'https://www.bizbuysell.com/schools-for-sale/',
-]);
-
-await Actor.exit();
+    'https://www.bizbuysell.
